@@ -1,0 +1,726 @@
+<title>Odys Landing Prototype</title>
+<meta name="description" content="Odys — the AI travel agent that never makes things up.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@50..150,300..900&family=Figtree:wght@400;500;700;800&family=Gloock&family=Instrument+Sans:wght@400;500;600;700&family=Unbounded:wght@400;600;800;900&family=Manrope:wght@400;500;700;800&family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: fixed WebGL sky behind a single scrolling column; a toy plane flies the page, pins drop where Odys verifies. */
+:root, :root[data-dir="a"] {
+  /* Direction A — Aegean Pop: Klein blue on limestone, sun yellow, stretchy variable type */
+  --bg: #F3EEE3; --ink: #1631C6; --accent: #FFC93C; --paper: #FFFFFF; --ok: #0E8157; --warn: #B45309;
+  --line: rgba(22,49,198,.16); --muted: rgba(22,49,198,.68); --on-accent: #1631C6;
+  --board-bg: #0F1A5C; --board-fg: #FFC93C; --board-cell: #16247A;
+  --display: "Anybody", "Arial Black", system-ui, sans-serif;
+  --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --display-weight: 900; --display-track: -0.02em; --radius: 22px;
+  color-scheme: light;
+}
+:root[data-dir="b"] {
+  /* Direction B — Logbook: brown ink on kraft (closest to Ciao Kombucha), passport stamps */
+  --bg: #EADFC8; --ink: #2F2521; --accent: #D9462B; --paper: #F8F1E2; --ok: #2F6B45; --warn: #9A3412;
+  --line: rgba(47,37,33,.18); --muted: rgba(47,37,33,.7); --on-accent: #F8F1E2;
+  --board-bg: #2F2521; --board-fg: #F8F1E2; --board-cell: #3E322C;
+  --display: "Gloock", Georgia, "Times New Roman", serif;
+  --body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display-weight: 400; --display-track: -0.01em; --radius: 6px;
+  color-scheme: light;
+}
+:root[data-dir="c"] {
+  /* Direction C — Night Flight: departures board after midnight, amber */
+  --bg: #0B1026; --ink: #EDEBFF; --accent: #FFB547; --paper: #151B3A; --ok: #5BE3A1; --warn: #FFB547;
+  --line: rgba(237,235,255,.14); --muted: rgba(237,235,255,.7); --on-accent: #0B1026;
+  --board-bg: #05070F; --board-fg: #FFB547; --board-cell: #111733;
+  --display: "Unbounded", "Arial Black", system-ui, sans-serif;
+  --body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display-weight: 800; --display-track: -0.03em; --radius: 14px;
+  color-scheme: dark;
+}
+:root { --s-1: .8125rem; --s0: 1rem; --s1: 1.25rem; --s2: 1.75rem; --s3: clamp(2.25rem, 5vw, 3.75rem); --s4: clamp(2.75rem, 7.5vw, 6rem); --w: 150; }
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 1.0625rem; line-height: 1.55; overflow-x: hidden; transition: background .5s, color .5s; }
+#scene { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+main, header, footer { position: relative; z-index: 1; }
+.wrap { width: 100%; max-width: 76rem; margin-inline: auto; padding-inline: max(16px, 4vw); }
+h1, h2, h3, .display { font-family: var(--display); font-weight: var(--display-weight); letter-spacing: var(--display-track); line-height: .98; text-wrap: balance; margin: 0; }
+p { margin: 0; }
+a { color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+.eyebrow { font-family: var(--mono); font-size: var(--s-1); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.note { font-family: var(--mono); font-size: .75rem; color: var(--muted); }
+
+/* Header */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-block: .9rem; }
+.logo { font-family: var(--display); font-weight: var(--display-weight); font-size: 1.6rem; text-decoration: none; letter-spacing: var(--display-track); display: flex; align-items: center; gap: .4rem; }
+.logo i { width: .55rem; height: .55rem; border-radius: 50%; background: var(--accent); display: inline-block; }
+.nav { display: flex; gap: 1.5rem; align-items: center; }
+.nav a { text-decoration: none; font-weight: 600; font-size: .95rem; }
+.nav a:not(.btn):hover { text-decoration: underline; text-underline-offset: 4px; }
+@media (max-width: 720px) { .nav a:not(.btn) { display: none; } }
+
+/* Buttons */
+.btn { --bb: var(--ink); display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 3rem; padding: 0 1.4rem; border-radius: 999px; border: 2px solid var(--bb); background: var(--ink); color: var(--bg); font: 700 1rem/1 var(--body); text-decoration: none; cursor: pointer; transition: transform .2s cubic-bezier(.3,1.6,.5,1), box-shadow .2s; box-shadow: 0 4px 0 0 var(--bb); }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 6px 0 0 var(--bb); }
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 0 var(--bb); }
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn.sun { background: var(--accent); color: var(--on-accent); }
+.btn.sm { min-height: 2.5rem; padding: 0 1rem; font-size: .9rem; box-shadow: 0 3px 0 0 var(--bb); }
+
+/* Hero */
+.hero { padding-block: clamp(2rem, 6vw, 5rem) 0; overflow: hidden; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 36rem) 1fr; gap: 2rem; align-items: center; }
+.hero-stage { display: none; }
+.hero h1 { font-size: var(--s4); }
+.hero .lede { font-size: var(--s1); margin-top: 1.25rem; max-width: 32rem; color: var(--ink); }
+.waitlist { margin-top: 2rem; display: grid; gap: .75rem; max-width: 32rem; }
+.field-row { display: flex; gap: .5rem; flex-wrap: wrap; }
+.field-row input[type=email] { flex: 1 1 14rem; min-width: 0; min-height: 3rem; border-radius: 999px; border: 2px solid var(--ink); background: var(--paper); color: var(--ink); padding: 0 1.2rem; font: 500 1rem var(--body); }
+.field-row input::placeholder { color: var(--muted); }
+.consent { display: flex; gap: .5rem; align-items: flex-start; font-size: .875rem; color: var(--muted); }
+.consent input { accent-color: var(--ink); margin-top: .2rem; }
+.form-msg { font-size: .9rem; min-height: 1.3em; }
+.form-msg.err { color: var(--warn); font-weight: 600; }
+.success { display: grid; gap: .6rem; padding: 1.1rem 1.2rem; border-radius: var(--radius); background: var(--paper); border: 2px solid var(--ink); }
+.success strong { font-size: 1.1rem; }
+.reflink { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.reflink code { font-family: var(--mono); font-size: .9rem; background: var(--bg); padding: .45rem .7rem; border-radius: 8px; user-select: all; overflow-wrap: anywhere; }
+.secondary-cta { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-top: .25rem; }
+.launch { font-family: var(--mono); font-size: .8rem; color: var(--muted); }
+.wordmark { font-family: var(--display); font-weight: var(--display-weight); font-size: clamp(7rem, 30vw, 26rem); line-height: .78; letter-spacing: -.04em; margin-top: clamp(2rem, 5vw, 4rem); white-space: nowrap; font-variation-settings: "wdth" var(--w); user-select: none; }
+:root[data-dir="b"] .wordmark { font-style: italic; letter-spacing: -.05em; }
+:root[data-dir="c"] .wordmark { font-size: clamp(5rem, 24vw, 21rem); -webkit-text-stroke: 2px var(--ink); color: transparent; }
+@media (max-width: 820px) {
+  .hero-grid { grid-template-columns: 1fr; }
+  .hero-stage { display: block; height: 220px; }
+}
+
+/* Marquee */
+.marquee { background: var(--ink); color: var(--bg); overflow: hidden; padding-block: .9rem; transform: rotate(-1.5deg); margin-block: 0 4rem; position: relative; z-index: 2; }
+.marquee-track { display: flex; gap: 2.5rem; white-space: nowrap; font-family: var(--display); font-weight: var(--display-weight); font-size: clamp(1.4rem, 3vw, 2.2rem); will-change: transform; }
+.marquee-track span { display: inline-flex; align-items: center; gap: 2.5rem; }
+.marquee-track span::after { content: "✦"; color: var(--accent); }
+
+/* Sections */
+section { padding-block: clamp(4rem, 10vw, 8rem); }
+.sec-head { display: grid; gap: 1rem; max-width: 44rem; margin-bottom: clamp(2rem, 5vw, 3.5rem); }
+.sec-head h2 { font-size: var(--s3); }
+.sec-head p { font-size: var(--s1); color: var(--muted); max-width: 38rem; }
+
+/* Versus */
+.versus { display: grid; gap: .75rem; }
+.vrow { display: grid; grid-template-columns: 1fr auto 1fr; gap: 1rem; align-items: center; padding: 1.1rem 1.3rem; border-radius: var(--radius); background: var(--paper); border: 2px solid var(--line); transition: transform .3s cubic-bezier(.3,1.6,.5,1), border-color .3s; }
+.vrow:hover { transform: rotate(-.6deg) scale(1.01); border-color: var(--ink); }
+.vrow .them { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--accent); text-decoration-thickness: 3px; }
+.vrow .arrow { font-family: var(--mono); color: var(--muted); }
+.vrow .us { font-weight: 700; }
+.vhead { display: grid; grid-template-columns: 1fr auto 1fr; gap: 1rem; padding-inline: 1.3rem; }
+.vhead span:nth-child(2) { visibility: hidden; font-family: var(--mono); }
+@media (max-width: 640px) { .vrow, .vhead { grid-template-columns: 1fr; gap: .35rem; } .vrow .arrow, .vhead span:nth-child(2) { display: none; } .vhead { display: none; } .vrow .them::before { content: "Other apps: "; text-decoration: none; display: inline; } }
+
+/* Feature split */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(2rem, 6vw, 5rem); align-items: center; }
+.split.rev > :first-child { order: 2; }
+@media (max-width: 860px) { .split { grid-template-columns: 1fr; } .split.rev > :first-child { order: 0; } }
+.feature h3 { font-size: var(--s3); }
+.feature p { font-size: var(--s1); margin-top: 1rem; max-width: 30rem; }
+.feature ul { margin: 1.5rem 0 0; padding: 0; list-style: none; display: grid; gap: .6rem; }
+.feature li { display: flex; gap: .6rem; align-items: baseline; }
+.feature li::before { content: "✓"; color: var(--ok); font-weight: 800; }
+
+/* Phone mock */
+.phone { width: min(100%, 22rem); margin-inline: auto; background: var(--paper); border: 2px solid var(--ink); border-radius: 36px; padding: 1.2rem 1rem 1.4rem; box-shadow: 10px 12px 0 0 var(--ink); transform: rotate(2deg); }
+.phone-top { display: flex; justify-content: space-between; align-items: baseline; padding: 0 .3rem .8rem; border-bottom: 2px dashed var(--line); }
+.phone-top b { font-family: var(--display); font-weight: var(--display-weight); font-size: 1.35rem; }
+.stop { display: grid; grid-template-columns: 3rem 1fr; gap: .2rem .7rem; padding: .85rem .3rem; border-bottom: 1px solid var(--line); }
+.stop time { font-family: var(--mono); font-size: .85rem; color: var(--muted); grid-row: span 2; padding-top: .1rem; }
+.stop .name { font-weight: 700; line-height: 1.25; }
+.leg { font-family: var(--mono); font-size: .75rem; color: var(--muted); padding: .35rem .3rem .35rem 3.7rem; }
+.pill { display: inline-flex; align-items: center; gap: .3rem; justify-self: start; font: 600 .75rem/1 var(--mono); padding: .35rem .55rem; border-radius: 999px; background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); border: 1.5px solid color-mix(in srgb, var(--ok) 40%, transparent); transition: all .3s; }
+.pill.unv { background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--muted); border-color: var(--line); }
+.pill.checking { background: transparent; color: var(--muted); border-style: dashed; border-color: var(--line); }
+.pill.checking::before { content: ""; width: .55rem; height: .55rem; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.pill.pop { animation: pop .45s cubic-bezier(.3,1.8,.5,1); }
+@keyframes pop { 0% { transform: scale(.7); } 100% { transform: scale(1); } }
+:root[data-dir="b"] .pill:not(.checking) { border-radius: 4px; border-width: 2px; border-style: double; text-transform: uppercase; letter-spacing: .06em; transform: rotate(-3deg); }
+
+/* Share + import */
+.linkcard { background: var(--paper); border: 2px solid var(--ink); border-radius: var(--radius); padding: 1.4rem; display: grid; gap: 1rem; box-shadow: -10px 12px 0 0 var(--accent); }
+.urlbar { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; font-family: var(--mono); font-size: .95rem; background: var(--bg); border-radius: 999px; padding: .4rem .4rem .4rem 1rem; }
+.urlbar span { flex: 1 1 10rem; min-width: 0; overflow-wrap: anywhere; }
+.viewers { display: flex; flex-wrap: wrap; gap: .5rem; }
+.viewer { display: inline-flex; align-items: center; gap: .45rem; font-size: .9rem; padding: .35rem .75rem .35rem .35rem; border-radius: 999px; border: 1.5px solid var(--line); }
+.viewer b { width: 1.7rem; height: 1.7rem; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--bg); font-size: .8rem; }
+.mail { display: grid; gap: .5rem; }
+.mailrow { display: flex; justify-content: space-between; gap: 1rem; align-items: center; padding: .7rem .9rem; border-radius: 12px; background: var(--bg); font-size: .95rem; }
+.mailrow.dup { outline: 2px dashed var(--accent); }
+.mailrow small { font-family: var(--mono); color: var(--muted); font-size: .75rem; }
+
+/* Copilot board */
+.copilot { height: 300vh; padding-block: 0; }
+.copilot-sticky { position: sticky; top: 0; min-height: 100vh; display: grid; align-content: center; padding-block: 4rem; }
+.board { background: var(--board-bg); color: var(--board-fg); border-radius: var(--radius); padding: clamp(1rem, 3vw, 1.8rem); overflow-x: auto; box-shadow: 0 30px 60px -30px rgba(0,0,0,.5); }
+.board-inner { min-width: 36rem; }
+.board-head, .board-row { display: grid; grid-template-columns: 6.5ch 8ch 5.5ch 4.5ch 1fr; gap: 1.2rem; font-family: var(--mono); }
+.board-head { font-size: .7rem; letter-spacing: .12em; opacity: .7; padding-bottom: .6rem; }
+.board-row { font-size: clamp(1rem, 2.2vw, 1.5rem); font-weight: 500; }
+.flap { display: flex; gap: 3px; }
+.flap span { display: inline-grid; place-items: center; width: 1.05em; height: 1.45em; background: var(--board-cell); border-radius: 3px; position: relative; }
+.flap span::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(0,0,0,.45); }
+.flap span.f { animation: flip .09s linear; }
+@keyframes flip { 0% { transform: scaleY(1); } 50% { transform: scaleY(.1); } 100% { transform: scaleY(1); } }
+.board-row.status .flap { flex-wrap: wrap; }
+.copilot-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 2rem; align-items: center; margin-top: 2rem; }
+@media (max-width: 860px) { .copilot-grid { grid-template-columns: 1fr; } }
+.notif { background: var(--paper); border: 2px solid var(--ink); border-radius: 20px; padding: 1rem 1.1rem; display: grid; gap: .35rem; box-shadow: 6px 8px 0 0 var(--ink); min-height: 8.5rem; }
+.notif .from { display: flex; justify-content: space-between; font-family: var(--mono); font-size: .75rem; color: var(--muted); }
+.notif p { font-weight: 600; }
+.stages { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1rem; }
+.stages button { font: 600 .8rem var(--mono); padding: .45rem .8rem; border-radius: 999px; border: 1.5px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; }
+.stages button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+/* Pricing */
+.billing { display: inline-flex; border: 2px solid var(--ink); border-radius: 999px; padding: 3px; gap: 3px; }
+.billing button { border: 0; border-radius: 999px; padding: .5rem 1rem; font: 700 .9rem var(--body); background: transparent; color: var(--ink); cursor: pointer; }
+.billing button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-top: 2rem; }
+@media (max-width: 860px) { .plans { grid-template-columns: 1fr; } }
+.plan { background: var(--paper); border: 2px solid var(--line); border-radius: var(--radius); padding: 1.5rem; display: grid; gap: .8rem; align-content: start; }
+.plan.hl { border-color: var(--ink); }
+.plan h3 { font-size: var(--s2); }
+.price { font-family: var(--display); font-weight: var(--display-weight); font-size: 2.6rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.price small { font-family: var(--body); font-size: 1rem; font-weight: 500; color: var(--muted); }
+.plan ul { margin: 0; padding: 0; list-style: none; display: grid; gap: .4rem; }
+.plan li::before { content: "✓ "; color: var(--ok); font-weight: 800; }
+.honest { margin-top: 1.5rem; display: flex; gap: 1.5rem; flex-wrap: wrap; font-weight: 700; }
+.honest span::before { content: "✦ "; color: var(--accent); }
+.founder { margin-top: clamp(3rem, 7vw, 5rem); background: var(--ink); color: var(--bg); border-radius: calc(var(--radius) + 8px); padding: clamp(1.5rem, 5vw, 3.5rem); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2rem; align-items: center; }
+.founder h3 { font-size: var(--s3); }
+.founder p { margin-top: .8rem; max-width: 34rem; opacity: .85; }
+.founder .btn { --bb: var(--accent); background: var(--accent); color: var(--on-accent); }
+.founder s { opacity: .6; }
+@media (max-width: 760px) { .founder { grid-template-columns: 1fr; } }
+
+/* FAQ */
+.faq { display: grid; gap: .6rem; max-width: 50rem; }
+.faq details { background: var(--paper); border: 2px solid var(--line); border-radius: var(--radius); padding: 1rem 1.2rem; }
+.faq details[open] { border-color: var(--ink); }
+.faq summary { font-weight: 700; cursor: pointer; font-size: 1.1rem; list-style: none; display: flex; justify-content: space-between; gap: 1rem; }
+.faq summary::after { content: "+"; font-family: var(--mono); }
+.faq details[open] summary::after { content: "–"; }
+.faq details p { margin-top: .6rem; color: var(--muted); max-width: 42rem; }
+
+/* Footer */
+.final { text-align: left; }
+.final h2 { font-size: var(--s4); max-width: 18ch; }
+footer { overflow: hidden; padding-block: 3rem 7rem; }
+footer .wordmark { margin-top: 1rem; font-size: clamp(6rem, 34vw, 30rem); }
+.foot-links { display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: .9rem; color: var(--muted); }
+
+/* Direction switcher */
+.dirs { position: fixed; z-index: 20; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: min(calc(100% - 32px), 34rem); background: var(--paper); color: var(--ink); border: 2px solid var(--ink); border-radius: 20px; padding: .6rem; display: grid; gap: .45rem; box-shadow: 0 12px 30px -12px rgba(0,0,0,.35); }
+.dirs .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .35rem; }
+.dirs button { border: 1.5px solid var(--line); background: transparent; color: var(--ink); border-radius: 12px; padding: .5rem .4rem; font: 700 .85rem var(--body); cursor: pointer; }
+.dirs button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.dirs p { font-size: .8rem; color: var(--muted); padding-inline: .3rem; }
+.dirs .lbl { font-family: var(--mono); font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-inline: .3rem; display: flex; justify-content: space-between; }
+.dirs .lbl button { border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline; }
+.dirs.min .row, .dirs.min p { display: none; }
+
+.toast { position: fixed; z-index: 30; left: 50%; top: calc(20px + env(safe-area-inset-top, 0px)); transform: translate(-50%, -150%); background: var(--ink); color: var(--bg); padding: .8rem 1.1rem; border-radius: 14px; font-weight: 600; max-width: calc(100% - 32px); transition: transform .35s cubic-bezier(.3,1.5,.5,1); }
+.toast.show { transform: translate(-50%, 0); }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+</style>
+
+<canvas id="scene" aria-hidden="true"></canvas>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label="Odys home"><i></i>odys</a>
+    <nav class="nav" aria-label="Main">
+      <a href="#how">How it works</a>
+      <a href="#copilot">Copilot</a>
+      <a href="#pricing">Pricing</a>
+      <a class="btn sm" href="#join">Join the waitlist</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero" aria-labelledby="h1">
+    <div class="wrap">
+      <div class="hero-stage" aria-hidden="true"></div>
+      <div class="hero-grid">
+        <div>
+          <p class="eyebrow">AI travel agent · Launching Dec 1, 2026</p>
+          <h1 id="h1" style="margin-top:1rem">The AI travel agent that never makes things up.</h1>
+          <p class="lede">Every place, opening hour and flight status is checked against live sources. Then Odys stays with you from takeoff to touchdown.</p>
+          <form class="waitlist" id="join" novalidate>
+            <div class="field-row">
+              <label for="email" class="eyebrow" style="position:absolute;left:-9999px">Email address</label>
+              <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+              <button class="btn" type="submit">Join the waitlist</button>
+            </div>
+            <label class="consent" for="consent"><input id="consent" type="checkbox"> Send me launch news and travel tips. Unsubscribe anytime.</label>
+            <p class="form-msg" id="formMsg" role="status" aria-live="polite"></p>
+            <div class="secondary-cta">
+              <a class="btn ghost sm preorder" href="#founder">Pre-order the Founder Pass</a>
+              <span class="launch">Web · iOS · Android</span>
+            </div>
+          </form>
+        </div>
+        <div aria-hidden="true"></div>
+      </div>
+    </div>
+    <div class="wrap"><div class="wordmark" id="wordmark" aria-hidden="true">odys</div></div>
+  </section>
+
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee-track" id="marquee"></div>
+  </div>
+
+  <section id="how" aria-labelledby="vs-h">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="eyebrow">Why travelers are fed up</p>
+        <h2 id="vs-h">Other apps guess. Odys checks.</h2>
+        <p>We read thousands of reviews of the big travel apps. The same five complaints keep coming back.</p>
+      </div>
+      <div class="vhead eyebrow"><span>Other travel apps</span><span>→</span><span>Odys</span></div>
+      <div class="versus">
+        <div class="vrow"><span class="them">Subscription traps, hard to cancel</span><span class="arrow">→</span><span class="us">Honest prices, monthly option, cancel in one click</span></div>
+        <div class="vrow"><span class="them">AI invents places and opening hours</span><span class="arrow">→</span><span class="us">Every place checked on live data, marked Verified or Not verified</span></div>
+        <div class="vrow"><span class="them">Everyone has to sign up to see the plan</span><span class="arrow">→</span><span class="us">Share with one link, no account needed</span></div>
+        <div class="vrow"><span class="them">Booking import misses or duplicates trips</span><span class="arrow">→</span><span class="us">Forward your emails, duplicates caught automatically</span></div>
+        <div class="vrow"><span class="them">No help when things go wrong</span><span class="arrow">→</span><span class="us">A copilot during the trip: alerts, plan B, refund claim help</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="ver-h">
+    <div class="wrap split">
+      <div class="feature">
+        <p class="eyebrow">Planning</p>
+        <h3 id="ver-h">Verified, not invented.</h3>
+        <p>Tell Odys what you like. It builds your days, and every stop is checked before you see it: it exists, it's open on your date, and the travel time is real.</p>
+        <ul>
+          <li>Live data from Google Places and transit routing</li>
+          <li>If we can't confirm something, we say so</li>
+          <li>Visa rules? Only official government links</li>
+        </ul>
+      </div>
+      <div>
+        <div class="phone itin" id="itin">
+          <div class="phone-top"><b>Lisbon · Day 2</b><span class="note">Sat 12 Dec</span></div>
+          <div class="stop"><time>09:30</time><span class="name">Pastelaria breakfast, Belém</span><span class="pill" data-final="✓ Verified · open">✓ Verified · open</span></div>
+          <div class="leg">↓ 6 min walk</div>
+          <div class="stop"><time>10:15</time><span class="name">Jerónimos Monastery</span><span class="pill" data-final="✓ Verified · open">✓ Verified · open</span></div>
+          <div class="leg">↓ 22 min by tram 15E</div>
+          <div class="stop"><time>13:00</time><span class="name">Lunch at Time Out Market</span><span class="pill" data-final="✓ Verified · open">✓ Verified · open</span></div>
+          <div class="leg">↓ 14 min walk</div>
+          <div class="stop"><time>17:30</time><span class="name">Rooftop bar a friend mentioned</span><span class="pill unv" data-final="Not verified · hours unknown" data-unv="1">Not verified · hours unknown</span></div>
+          <p class="note" style="padding:.8rem .3rem 0">Illustrative example. In the app, every badge links to its source.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="share-h">
+    <div class="wrap split rev">
+      <div class="feature">
+        <p class="eyebrow">Sharing & bookings</p>
+        <h3 id="share-h">One link. Zero sign-ups.</h3>
+        <p>Send the trip to your group chat. Mum, your friends, your partner: they open it in a browser. Forward your booking emails and Odys files them, catching the duplicates.</p>
+        <ul>
+          <li>Read-only link, revocable anytime</li>
+          <li>Flights, hotels, trains from forwarded emails</li>
+          <li>The same booking twice? Merged, not doubled</li>
+        </ul>
+      </div>
+      <div class="linkcard">
+        <div class="urlbar"><span id="tripUrl">odys.ai/t/lisbon-4-days-k2p9</span><button class="btn sm" type="button" id="copyTrip">Copy link</button></div>
+        <div>
+          <p class="eyebrow" style="margin-bottom:.5rem">Opened without an account</p>
+          <div class="viewers"><span class="viewer"><b>M</b>Mum</span><span class="viewer"><b>L</b>Léa</span><span class="viewer"><b>S</b>Sam</span></div>
+        </div>
+        <div class="mail">
+          <p class="eyebrow">Forwarded to trips@odys.ai</p>
+          <div class="mailrow"><span>✈ Flight Paris → Lisbon</span><small>imported</small></div>
+          <div class="mailrow"><span>🛏 Hotel, 3 nights</span><small>imported</small></div>
+          <div class="mailrow dup"><span>🛏 Hotel, 3 nights (reminder)</span><small>duplicate · merged</small></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="copilot" id="copilot" aria-labelledby="co-h">
+    <div class="copilot-sticky">
+      <div class="wrap">
+        <div class="sec-head" style="margin-bottom:0">
+          <p class="eyebrow">Copilot · keep scrolling</p>
+          <h2 id="co-h">When the board turns red, Odys already has a plan B.</h2>
+        </div>
+        <div class="copilot-grid">
+          <div class="board" role="img" aria-label="Departures board for a fictional flight OD 204 to Lisbon" id="board">
+            <div class="board-inner">
+              <div class="board-head"><span>FLIGHT</span><span>TO</span><span>TIME</span><span>GATE</span><span>STATUS</span></div>
+              <div class="board-row status"><span class="flap" data-len="6" id="fFlight"></span><span class="flap" data-len="7" id="fTo"></span><span class="flap" data-len="5" id="fTime"></span><span class="flap" data-len="3" id="fGate"></span><span class="flap" data-len="11" id="fStatus"></span></div>
+            </div>
+          </div>
+          <div>
+            <div class="notif" aria-live="polite">
+              <div class="from"><span>ODYS COPILOT</span><span id="nTime">now</span></div>
+              <p id="nText">All good. Leave for the airport at 16:10.</p>
+            </div>
+            <div class="stages" role="group" aria-label="Scenario steps">
+              <button type="button" data-stage="0" aria-pressed="true">On time</button>
+              <button type="button" data-stage="1" aria-pressed="false">Gate change</button>
+              <button type="button" data-stage="2" aria-pressed="false">Delay</button>
+              <button type="button" data-stage="3" aria-pressed="false">Cancelled</button>
+            </div>
+            <p class="note" style="margin-top:.8rem">Fictional flight, illustrative scenario.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="pricing" aria-labelledby="pr-h">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="eyebrow">Honest pricing</p>
+        <h2 id="pr-h">Pay per trip or per month. Cancel in one click.</h2>
+        <p>No free-trial trap. No yearly lock-in you find out about later.</p>
+      </div>
+      <div class="billing" role="group" aria-label="Plus billing period">
+        <button type="button" data-bill="m" aria-pressed="true">Monthly</button>
+        <button type="button" data-bill="y" aria-pressed="false">Yearly</button>
+      </div>
+      <div class="plans" id="plans"></div>
+      <div class="honest"><span>Cancel in one click</span><span>Reminder before any renewal</span><span>Launch prices, may change</span></div>
+
+      <div class="founder" id="founder">
+        <div>
+          <p class="eyebrow" style="color:inherit;opacity:.7">Founder Pass · limited to pre-orders</p>
+          <h3>1 year of Plus for <span id="founderPrice">$49</span> <s id="founderWas">$79</s></h3>
+          <p>Fully refundable until launch day. One email and it's done.</p>
+        </div>
+        <a class="btn preorder" href="#founder">Pre-order for <span id="founderBtn">$49</span></a>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="faq-h">
+    <div class="wrap">
+      <div class="sec-head"><p class="eyebrow">Questions</p><h2 id="faq-h">Straight answers.</h2></div>
+      <div class="faq">
+        <details><summary>When does Odys launch?</summary><p>December 1, 2026, on the web, iOS and Android. The waitlist gets access first.</p></details>
+        <details><summary>How do you verify places?</summary><p>Each place, opening hour and travel time comes from live data (Google Places, transit routing, flight-status providers). The AI organizes your trip; it never supplies the facts itself. If something can't be checked, it's labeled Not verified.</p></details>
+        <details><summary>Do you give visa advice?</summary><p>No. Visa rules change and mistakes are costly, so we only link to official government sources.</p></details>
+        <details><summary>Can I get my pre-order refunded?</summary><p>Yes, in full, anytime before launch. Email us and it's done.</p></details>
+        <details><summary>Will you sell my email?</summary><p>Never. We use it to tell you when Odys launches, and for tips only if you ticked the box.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="final" aria-labelledby="fin-h">
+    <div class="wrap">
+      <h2 id="fin-h">Travel with an agent that tells you the truth.</h2>
+      <div class="field-row" style="margin-top:2rem;max-width:32rem"><a class="btn sun" href="#join">Join the waitlist</a><a class="btn ghost preorder" href="#founder">Founder Pass</a></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-links"><span>© 2026 Odys</span><a href="#top">Privacy (draft)</a><a href="#top">Terms (draft)</a><span>hello@odys.ai</span></div>
+    <div class="wordmark" aria-hidden="true">odys</div>
+  </div>
+</footer>
+
+<div class="dirs" id="dirs" role="region" aria-label="Design direction">
+  <div class="lbl"><span>Design direction · prototype</span><button type="button" id="dirsMin">Hide</button></div>
+  <div class="row">
+    <button type="button" data-dir="a" aria-pressed="true">A · Aegean Pop</button>
+    <button type="button" data-dir="b" aria-pressed="false">B · Logbook</button>
+    <button type="button" data-dir="c" aria-pressed="false">C · Night Flight</button>
+  </div>
+  <p id="dirNote"></p>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  // ---------- Config (single source for prices) ----------
+  const PRICING = { currency: "$", free: 0, tripPass: 9.99, plusMonthly: 9.99, plusYearly: 79, founder: 49 };
+  const fmt = n => PRICING.currency + (Number.isInteger(n) ? n : n.toFixed(2));
+
+  const DIRS = {
+    a: { note: "Aegean Pop — Klein blue on limestone, stretchy variable type that squeezes as you scroll. Most playful and shareable.",
+         c3d: { body: 0xffffff, wing: 0x1631c6, accent: 0xffc93c, cloud: 0xffffff, pin: 0x0e8157, trail: 0x1631c6 } },
+    b: { note: "Logbook — brown ink on kraft paper, serif display, passport-stamp badges. Closest to Ciao Kombucha.",
+         c3d: { body: 0xf8f1e2, wing: 0xd9462b, accent: 0x2f2521, cloud: 0xf8f1e2, pin: 0x2f6b45, trail: 0x2f2521 } },
+    c: { note: "Night Flight — an airport departures board after midnight, amber on navy. Most premium, least playful.",
+         c3d: { body: 0xedebff, wing: 0xffb547, accent: 0x7c8cff, cloud: 0x26305e, pin: 0x5be3a1, trail: 0xffb547 } }
+  };
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+  const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+
+  const toastEl = $("#toast"); let toastT;
+  function toast(msg) { toastEl.textContent = msg; toastEl.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove("show"), 3200); }
+
+  // ---------- Marquee ----------
+  const words = ["Verified places", "Honest prices", "Cancel in one click", "Share with one link", "A copilot when flights go wrong", "No invented facts"];
+  const track = $("#marquee");
+  track.innerHTML = [0, 1, 2].map(() => words.map(w => `<span>${w}</span>`).join("")).join("");
+  let mx = 0, lastY = scrollY, vel = 0;
+
+  // ---------- Pricing ----------
+  let bill = "m";
+  function renderPlans() {
+    const plus = bill === "m" ? `${fmt(PRICING.plusMonthly)}<small> / month</small>` : `${fmt(PRICING.plusYearly)}<small> / year</small>`;
+    $("#plans").innerHTML = `
+      <article class="plan"><h3>Free</h3><div class="price">${fmt(PRICING.free)}</div><ul><li>Verified trip planning</li><li>Share by link</li><li>1 active trip</li></ul></article>
+      <article class="plan"><h3>Trip Pass</h3><div class="price">${fmt(PRICING.tripPass)}<small> / trip</small></div><ul><li>Everything in Free</li><li>Copilot and flight alerts</li><li>Refund claim help</li></ul></article>
+      <article class="plan hl"><h3>Plus</h3><div class="price">${plus}</div><ul><li>Unlimited trips</li><li>Copilot on every trip</li><li>Monthly or yearly, your call</li></ul></article>`;
+  }
+  $$(".billing button").forEach(b => b.addEventListener("click", () => { bill = b.dataset.bill; $$(".billing button").forEach(x => x.setAttribute("aria-pressed", x === b)); renderPlans(); }));
+  renderPlans();
+  $("#founderPrice").textContent = fmt(PRICING.founder); $("#founderBtn").textContent = fmt(PRICING.founder); $("#founderWas").textContent = fmt(PRICING.plusYearly);
+
+  // ---------- Waitlist (prototype: nothing is sent) ----------
+  const form = $("#join"), msg = $("#formMsg");
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    const email = $("#email").value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { msg.textContent = "That email doesn't look right. Check for a typo and try again."; msg.className = "form-msg err"; $("#email").focus(); return; }
+    const ref = Math.random().toString(36).slice(2, 8);
+    form.innerHTML = `<div class="success"><strong>You're on the list.</strong><span>We'll email you before launch. Want earlier access? Share your link: every friend who joins moves you up.</span>
+      <div class="reflink"><code id="refCode">odys.ai/?ref=${ref}</code><button class="btn sm" type="button" id="copyRef">Copy</button></div>
+      <span class="note">Prototype: nothing was sent.</span></div>`;
+    $("#copyRef").addEventListener("click", () => copy($("#refCode")));
+  });
+  function copy(el) {
+    const text = el.textContent;
+    const done = () => toast("Copied: " + text);
+    try { navigator.clipboard.writeText(text).then(done, () => { select(el); toast("Press Ctrl/Cmd + C to copy"); }); } catch { select(el); }
+  }
+  function select(el) { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+  $("#copyTrip").addEventListener("click", () => copy($("#tripUrl")));
+  $$(".preorder").forEach(a => a.addEventListener("click", () => toast(`On the live page this opens Stripe checkout (${fmt(PRICING.founder)}, refundable until launch).`)));
+
+  // ---------- Verified badges ----------
+  const itin = $("#itin"), pills = [...itin.querySelectorAll(".pill")];
+  const r0 = itin.getBoundingClientRect();
+  if (!reduce && r0.top > innerHeight) {
+    pills.forEach(p => { p.className = "pill checking"; p.textContent = "Checking live sources"; });
+    new IntersectionObserver((ents, ob) => {
+      if (!ents[0].isIntersecting) return; ob.disconnect();
+      pills.forEach((p, i) => setTimeout(() => { p.className = "pill pop" + (p.dataset.unv ? " unv" : ""); p.textContent = p.dataset.final; }, 500 + i * 550));
+    }, { threshold: .5 }).observe(itin);
+  }
+
+  // ---------- Split-flap board ----------
+  const CH = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:";
+  const STAGES = [
+    { flight: "OD 204", to: "LISBON", time: "18:40", gate: "B12", status: "ON TIME", n: "All good. Leave for the airport at 16:10.", t: "15:52" },
+    { flight: "OD 204", to: "LISBON", time: "18:40", gate: "B42", status: "GATE CHANGE", n: "Gate moved to B42, about 9 minutes' walk from security.", t: "17:31" },
+    { flight: "OD 204", to: "LISBON", time: "19:35", gate: "B42", status: "DELAYED", n: "Delayed 55 min. You still make your 21:00 dinner: we re-checked the travel time.", t: "17:58" },
+    { flight: "OD 204", to: "LISBON", time: "--:--", gate: "---", status: "CANCELLED", n: "Cancelled. Plan B: OD 206 tomorrow at 07:10 has seats. Your refund claim is drafted. You may be eligible for compensation.", t: "18:12" }
+  ];
+  const cells = {};
+  ["Flight", "To", "Time", "Gate", "Status"].forEach(k => { const el = $("#f" + k); const n = +el.dataset.len; el.innerHTML = "<span></span>".repeat(n); cells[k.toLowerCase()] = [...el.children]; });
+  function setFlap(key, text, animate) {
+    const cs = cells[key]; text = text.toUpperCase().padEnd(cs.length).slice(0, cs.length);
+    cs.forEach((c, i) => {
+      const target = text[i]; if (c.textContent === target || (!c.textContent && target === " ")) return;
+      if (!animate) { c.textContent = target.trim(); return; }
+      let n = 4 + Math.floor(Math.random() * 6);
+      const tick = () => { c.classList.remove("f"); void c.offsetWidth; c.classList.add("f");
+        if (--n <= 0) { c.textContent = target.trim(); return; }
+        const pool = /[0-9]/.test(target) ? "0123456789" : CH; c.textContent = pool[Math.floor(Math.random() * pool.length)];
+        setTimeout(tick, 55); };
+      setTimeout(tick, i * 25);
+    });
+  }
+  let stage = -1;
+  function setStage(s, animate = true) {
+    if (s === stage) return; stage = s; const d = STAGES[s];
+    ["flight", "to", "time", "gate", "status"].forEach(k => setFlap(k, d[k], animate && !reduce));
+    $("#nText").textContent = d.n; $("#nTime").textContent = d.t;
+    $$(".stages button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.stage === s));
+  }
+  setStage(0, false);
+  let manualStageUntil = 0;
+  $$(".stages button").forEach(b => b.addEventListener("click", () => { manualStageUntil = performance.now() + 4000; setStage(+b.dataset.stage); }));
+
+  // ---------- Direction switcher ----------
+  let dir = store.get("odys-dir") || "a"; if (!DIRS[dir]) dir = "a";
+  function applyDir(d) {
+    dir = d; document.documentElement.dataset.dir = d; store.set("odys-dir", d);
+    $$("#dirs .row button").forEach(b => b.setAttribute("aria-pressed", b.dataset.dir === d));
+    $("#dirNote").textContent = DIRS[d].note;
+    if (window.recolor) window.recolor(DIRS[d].c3d);
+  }
+  $$("#dirs .row button").forEach(b => b.addEventListener("click", () => applyDir(b.dataset.dir)));
+  $("#dirsMin").addEventListener("click", e => { const m = $("#dirs").classList.toggle("min"); e.target.textContent = m ? "Show" : "Hide"; });
+
+  // ---------- 3D scene ----------
+  function initScene() {
+    if (!window.THREE) return;
+    const canvas = $("#scene");
+    let renderer;
+    try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true }); } catch { return; }
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100); camera.position.set(0, 0, 9);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x8f96b8, 0.95));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.85); sun.position.set(3, 5, 6); scene.add(sun);
+
+    const mat = k => new THREE.MeshStandardMaterial({ roughness: .45, metalness: .05 });
+    const M = { body: mat(), wing: mat(), accent: mat(), cloud: new THREE.MeshStandardMaterial({ roughness: 1, transparent: true, opacity: .92 }), pin: mat() };
+    const trailMat = new THREE.PointsMaterial({ size: .07, sizeAttenuation: true });
+
+    // Toy plane, nose along +z
+    const outer = new THREE.Group(), plane = new THREE.Group(); outer.add(plane); scene.add(outer);
+    const add = (geo, m, pos, rot) => { const o = new THREE.Mesh(geo, m); if (pos) o.position.set(...pos); if (rot) o.rotation.set(...rot); plane.add(o); return o; };
+    add(new THREE.CylinderGeometry(.3, .24, 1.9, 32), M.body, [0, 0, 0], [Math.PI / 2, 0, 0]);
+    add(new THREE.SphereGeometry(.3, 32, 16), M.body, [0, 0, .95]).scale.set(1, 1, 1.35);
+    add(new THREE.ConeGeometry(.24, .75, 32), M.body, [0, .04, -1.3], [-Math.PI / 2, 0, 0]);
+    add(new THREE.SphereGeometry(.12, 16, 12), M.accent, [0, 0, 1.33]);
+    add(new THREE.BoxGeometry(2.9, .07, .62), M.wing, [0, -.06, .1]);
+    add(new THREE.BoxGeometry(1.0, .05, .32), M.wing, [0, .06, -1.35]);
+    add(new THREE.BoxGeometry(.06, .6, .42), M.wing, [0, .36, -1.35], [-.25, 0, 0]);
+    [-.75, .75].forEach(x => {
+      add(new THREE.CylinderGeometry(.12, .1, .5, 20), M.accent, [x, -.2, .28], [Math.PI / 2, 0, 0]);
+      add(new THREE.SphereGeometry(.14, 16, 12), M.wing, [x * 1.95, -.06, .1]).scale.set(1, .5, 2.2);
+    });
+    for (let i = 0; i < 6; i++) { const z = .55 - i * .22; [-1, 1].forEach(s => add(new THREE.SphereGeometry(.055, 12, 8), M.accent, [s * .27, .08, z])); }
+
+    // Pins (drop where Odys "verifies" a stop)
+    const PIN_P = [.16, .32, .5, .68, .84];
+    const pins = PIN_P.map(pk => {
+      const g = new THREE.Group();
+      const head = new THREE.Mesh(new THREE.SphereGeometry(.22, 24, 16), M.pin); head.position.y = .45;
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(.09, 12, 8), M.cloud); dot.position.set(0, .45, .18);
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(.2, .45, 24), M.pin); tip.rotation.x = Math.PI; tip.position.y = .12;
+      g.add(head, dot, tip); g.scale.setScalar(0); scene.add(g); return { g, pk };
+    });
+
+    // Clouds
+    const clouds = [];
+    for (let i = 0; i < 8; i++) {
+      const g = new THREE.Group();
+      [[0, 0, 0, .55], [.5, .1, 0, .42], [-.5, -.05, 0, .4], [.2, .35, -.1, .38], [-.2, .28, .05, .33]].forEach(([x, y, z, r]) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), M.cloud); m.position.set(x, y, z); g.add(m); });
+      const seed = { x: (Math.random() * 2 - 1), y: Math.random() * 8 - 4, z: -2 - Math.random() * 4, s: .6 + Math.random() * .7, v: .05 + Math.random() * .08 };
+      g.scale.setScalar(seed.s); scene.add(g); clouds.push({ g, seed });
+    }
+
+    // Trail
+    const TN = 90, trailPos = new Float32Array(TN * 3);
+    const trailGeo = new THREE.BufferGeometry(); trailGeo.setAttribute("position", new THREE.BufferAttribute(trailPos, 3));
+    const trail = new THREE.Points(trailGeo, trailMat); scene.add(trail);
+
+    window.recolor = c => { M.body.color.set(c.body); M.wing.color.set(c.wing); M.accent.color.set(c.accent); M.cloud.color.set(c.cloud); M.pin.color.set(c.pin); trailMat.color.set(c.trail); };
+    window.recolor(DIRS[dir].c3d);
+
+    let vw, vh, visH, visW, A, Y0, K, S, mobile;
+    const yForPx = px => visH / 2 - px * visH / innerHeight;
+    function resize() {
+      const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false);
+      camera.aspect = w / h; camera.updateProjectionMatrix();
+      visH = 2 * 9 * Math.tan(THREE.MathUtils.degToRad(17.5)); visW = visH * camera.aspect;
+      mobile = w < 820;
+      A = mobile ? visW * .28 : Math.min(visW * .3, 3.6);
+      Y0 = mobile ? yForPx(150) : yForPx(h * .42);
+      S = mobile ? Math.max(.5, Math.min(.72, visW / 5)) : Math.min(1.15, visW / 10);
+      const scrollable = Math.max(1, document.documentElement.scrollHeight - h);
+      K = scrollable * visH / h;
+    }
+    resize(); addEventListener("resize", resize);
+
+    const N = 7;
+    const pathAt = (p, out) => { const th = p * Math.PI * N; return out.set(A * Math.cos(th), Y0 + .25 * Math.sin(th * 2), 1.6 * Math.sin(th)); };
+    const tmp = new THREE.Vector3(), ahead = new THREE.Vector3();
+    let p = 0, pointer = { x: 0, y: 0 };
+    addEventListener("pointermove", e => { pointer.x = e.clientX / innerWidth * 2 - 1; pointer.y = e.clientY / innerHeight * 2 - 1; }, { passive: true });
+    const easeBack = t => { const c = 1.9; t = Math.min(1, Math.max(0, t)); return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
+
+    let t0 = performance.now();
+    function frame(now) {
+      requestAnimationFrame(frame);
+      if (document.hidden) return;
+      const t = (now - t0) / 1000;
+      const target = Math.min(1, Math.max(0, scrollY / Math.max(1, document.documentElement.scrollHeight - innerHeight)));
+      p += reduce ? (target - p) : (target - p) * .08;
+
+      pathAt(p, tmp); outer.position.copy(tmp);
+      pathAt(Math.min(1, p + .004), ahead);
+      if (p > .998) ahead.set(tmp.x - 1, tmp.y, tmp.z);
+      ahead.y = tmp.y; outer.lookAt(ahead);
+      const hero = Math.max(0, 1 - scrollY / (innerHeight * .8));
+      outer.scale.setScalar(S * (1 + .25 * hero));
+      const bank = -Math.cos(p * Math.PI * N) * .5;
+      plane.rotation.z = reduce ? 0 : bank + Math.sin(t * 1.3) * .05 + pointer.x * .15 * hero;
+      plane.rotation.x = reduce ? 0 : Math.sin(t * .9) * .04 + pointer.y * .12 * hero;
+      plane.rotation.y = reduce ? 0 : hero * (Math.sin(t * .6) * .5 - .6);
+      outer.position.y += reduce ? 0 : Math.sin(t * 1.6) * .06;
+
+      pins.forEach(({ g, pk }) => {
+        const k = easeBack((p - pk) / .02);
+        g.scale.setScalar(k * S * 1.1); g.visible = k > 0.001;
+        pathAt(pk, g.position); g.position.y += -.9 + (p - pk) * K; g.position.z -= .4;
+        g.rotation.y = t * .8;
+      });
+      clouds.forEach(({ g, seed }) => {
+        const span = visH + 4;
+        let y = seed.y + p * K * .35; y = ((y + span / 2) % span + span) % span - span / 2;
+        g.position.set(seed.x * (visW / 2 + 1) + Math.sin(t * seed.v) * .6, y, seed.z);
+      });
+      for (let i = 0; i < TN; i++) {
+        const pp = Math.max(0, p - (i + 3) * .0009); pathAt(pp, ahead);
+        trailPos[i * 3] = ahead.x; trailPos[i * 3 + 1] = ahead.y + (p - pp) * K; trailPos[i * 3 + 2] = ahead.z;
+      }
+      trailGeo.attributes.position.needsUpdate = true;
+      trailGeo.setDrawRange(0, p > .002 ? TN : 0);
+      renderer.render(scene, camera);
+    }
+    requestAnimationFrame(frame);
+    new ResizeObserver(resize).observe(document.body);
+  }
+
+  applyDir(dir);
+  initScene();
+
+  // ---------- Scroll-linked bits (wordmark width, marquee, board) ----------
+  const wm = $("#wordmark"), cop = $("#copilot");
+  function onScroll() {
+    const y = scrollY;
+    vel = y - lastY; lastY = y;
+    const w = Math.max(60, 150 - y / 6); document.documentElement.style.setProperty("--w", w.toFixed(1));
+    const r = cop.getBoundingClientRect();
+    const prog = Math.min(1, Math.max(0, -r.top / Math.max(1, r.height - innerHeight)));
+    if (performance.now() > manualStageUntil) setStage(Math.min(3, Math.floor(prog * 4.2)));
+  }
+  addEventListener("scroll", onScroll, { passive: true }); onScroll();
+  function loopMarquee() {
+    if (!reduce) {
+      mx -= 0.6 + Math.min(12, Math.abs(vel) * .15); vel *= .9;
+      const third = track.scrollWidth / 3; if (-mx > third) mx += third;
+      track.style.transform = `translateX(${mx}px)`;
+    }
+    requestAnimationFrame(loopMarquee);
+  }
+  loopMarquee();
+})();
+</script>
