@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Niveaux quotidiens pour le rapport NQ / ES : cours, RSI 14, MM20/MM50, plus haut/bas/clôture de la veille.
+"""Niveaux quotidiens pour le rapport NQ / ES : cours, RSI 14, MM20/MM50, plus haut/bas/clôture de la veille, signal de croisement de la MM20.
 
 Bibliothèque standard uniquement. Source : Yahoo Finance (gratuit, non officiel, peut être en retard).
 Usage : python3 -I niveaux.py NQ=F ES=F > marche.json
@@ -43,6 +43,14 @@ def instrument(sym):
     # La dernière barre est la séance en cours ; la veille est l'avant-dernière.
     _, hv, bv, cv = rows[-2]
     m20, m50 = mm(closes, 20), mm(closes, 50)
+    # Signal de croisement : la clôture de la veille était d'un côté de sa MM20, le dernier cours est de l'autre.
+    m20_veille = mm(closes[:-1], 20)
+    signaux = []
+    if m20 is not None and m20_veille is not None:
+        if cv < m20_veille and dernier > m20:
+            signaux.append("Repasse au-dessus de la MM20")
+        elif cv > m20_veille and dernier < m20:
+            signaux.append("Repasse sous la MM20")
     return {
         "symbole": sym,
         "nom": NOMS.get(sym, sym),
@@ -57,6 +65,7 @@ def instrument(sym):
         "haut_veille": round(hv, 2),
         "bas_veille": round(bv, 2),
         "cloture_veille": round(cv, 2),
+        "signaux": signaux,
     }
 
 
