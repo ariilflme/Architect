@@ -21,7 +21,7 @@ Page : https://claude.ai/artifact/77T9cZME7Crbx6WiqmSm2g (collection `rapports`,
    Ne mets jamais à jour ce commit sans une nouvelle relecture demandée par l'utilisateur.
 3. Lance en parallèle `marche-collecteur`, `veille-news` et `contexte-crypto`, en leur donnant le chemin `WORK` et la racine du dépôt.
 4. Quand les trois ont fini (même en erreur), lance `redacteur-rapport` avec `WORK`.
-5. Écris `$WORK/rapport.json` dans la page avec l'outil `ArtifactData` : action `set`, url de la page, collection `rapports`, doc_id = la date du rapport.
+5. Écris `$WORK/rapport.json` dans la page avec l'outil `ArtifactData` : action `set`, url de la page, collection `rapports`, doc_id = la date du rapport (`file_path` = `$WORK/rapport.json`). Si le document du jour existe déjà (relance), lis-le avec `get` et passe sa `version` en `if_version`.
 6. Termine par une phrase de résumé (elle sert de notification push).
 
 Si une source est en panne, le rapport part quand même avec la section marquée indisponible.
